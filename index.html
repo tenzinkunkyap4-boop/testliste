@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <!-- Damit die Seite auf dem Handy richtig skaliert -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Die kommenden Tests</title>
+  <!-- Relativer Pfad, damit es auch auf GitHub Pages funktioniert -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Blauer Balken oben -->
+  <header class="balken">
+    <h1 id="titel" class="titel">Die kommenden Tests</h1>
+  </header>
+
+  <!-- Seite 1: die Liste -->
+  <main id="listenseite" class="inhalt">
+    <!-- Hier fügt script.js die Karten ein -->
+    <ul id="liste" class="liste"></ul>
+
+    <!-- Wird nur gezeigt, wenn die Liste leer ist -->
+    <div id="leer" class="leer" hidden>
+      <div class="leer-quadrat" aria-hidden="true">+</div>
+      <p class="leer-text">Trage deinen ersten Test ein</p>
+    </div>
+  </main>
+
+  <!-- Seite 2: das Formular. Versteckt, bis man auf das Plus klickt -->
+  <main id="formularseite" class="inhalt" hidden>
+    <!-- novalidate: Wir prüfen selbst und zeigen eine eigene Meldung -->
+    <form id="formular" class="formular" novalidate>
+      <label for="fach">Fach</label>
+      <input id="fach" type="text" autocomplete="off">
+
+      <label for="datum">Datum</label>
+      <input id="datum" type="date">
+
+      <label for="themen">Themen</label>
+      <textarea id="themen" rows="4"></textarea>
+
+      <!-- role="alert": Screenreader lesen die Meldung sofort vor -->
+      <p id="meldung" class="meldung" role="alert" hidden></p>
+
+      <button type="submit" class="knopf">Hinzufügen</button>
+      <button type="button" id="zurueck" class="knopf-leise">Zurück</button>
+    </form>
+  </main>
+
+  <!-- Blauer Balken unten mit dem Plus-Knopf -->
+  <footer id="balken-unten" class="balken balken-unten">
+    <button type="button" id="plus" class="plus" aria-label="Test hinzufügen">+</button>
+  </footer>
+
+  <!-- Das Skript steht am Ende, damit das HTML vorher fertig geladen ist -->
+  <script src="script.js"></script>
+
+</body>
+</html>
