@@ -18,6 +18,12 @@
   box-sizing: border-box;
 }
 
+/* "hidden" soll immer verstecken, auch wenn eine Klasse
+   display: grid oder flex setzt */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   /* Systemschrift: lädt nichts nach und sieht überall vertraut aus */
@@ -140,6 +146,29 @@ body {
   color: var(--warnung);
 }
 
+/* Kleiner, unauffälliger Löschen-Knopf auf jeder Karte */
+.loeschen {
+  margin-top: 8px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--text-leise);
+  font: inherit;
+  font-size: 14px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.loeschen:hover {
+  color: var(--warnung);
+}
+
+/* Der Knopf zum Archiv und zurück, mittig unter der Liste */
+.archiv-link {
+  display: block;
+  margin: 24px auto 0;
+}
+
 /* ---------------------------------------------------------
    Leere Liste
    --------------------------------------------------------- */
@@ -163,6 +192,19 @@ body {
   font-size: 64px;
   line-height: 1;
   color: var(--blau);
+  /* Das Quadrat ist ein Knopf: Browser-Aussehen zurücksetzen */
+  background: #ffffff;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.leer-quadrat:hover {
+  border-color: var(--blau);
+}
+
+.leer-quadrat:focus-visible {
+  outline: 3px solid var(--blau);
+  outline-offset: 3px;
 }
 
 .leer-text {

@@ -3,26 +3,20 @@
 // Das Datum steht als JJJJ-MM-TT da. In dieser Form lässt es
 // sich eindeutig lesen und einfach sortieren.
 // ---------------------------------------------------------
-const BEISPIELE = [
-  { fach: "Wirtschaft", datum: "2026-10-11" },
-  { fach: "Mathe", datum: "2026-10-18" },
-  { fach: "Deutsch", datum: "2026-10-28" },
-  { fach: "Englisch", datum: "2026-11-10" }
-];
 
 // Unter diesem Namen liegt die Liste im Browser-Speicher
 const SPEICHER_NAME = "tests";
 
 // Holt die Liste aus dem Browser. Beim ersten Besuch gibt es
-// noch nichts, dann nehmen wir die Beispiele.
+// noch nichts, dann startet man mit einer leeren Liste.
 function laden() {
   try {
     const text = localStorage.getItem(SPEICHER_NAME);
     if (text) return JSON.parse(text);
   } catch (fehler) {
-    // Speicher gesperrt (z. B. privates Fenster): Beispiele nehmen
+    // Speicher gesperrt (z. B. privates Fenster): leer starten
   }
-  return BEISPIELE.slice();
+  return [];
 }
 
 // Legt die Liste als Text im Browser ab
@@ -63,6 +57,11 @@ function tageBis(datum) {
   const heute = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
   const msProTag = 24 * 60 * 60 * 1000;
   return Math.round((datum - heute) / msProTag);
+}
+
+// Ein Test ist vorbei, wenn sein Datum vor heute liegt
+function istVorbei(test) {
+  return tageBis(zuDatum(test.datum)) < 0;
 }
 
 // Formuliert die Anzahl Tage als Satz
@@ -124,58 +123,101 @@ function karteBauen(test) {
     angaben.appendChild(warnung);
   }
 
+  // Knopf zum Löschen dieses einen Tests
+  const loeschen = document.createElement("button");
+  loeschen.type = "button";
+  loeschen.className = "loeschen";
+  loeschen.textContent = "Löschen";
+  loeschen.addEventListener("click", function () {
+    loeschenTest(test);
+  });
+  angaben.appendChild(loeschen);
+
   karte.appendChild(angaben);
   return karte;
+}
+
+// ---------------------------------------------------------
+// Einen Test löschen
+// ---------------------------------------------------------
+function loeschenTest(test) {
+  if (!confirm("«" + test.fach + "» wirklich löschen?")) return;
+
+  // indexOf findet die Stelle dieses Tests in der Originalliste
+  const stelle = tests.indexOf(test);
+  tests.splice(stelle, 1);
+  speichern();
+  anzeigen();
+}
+
+// ---------------------------------------------------------
+// Karten in eine Liste füllen
+// ---------------------------------------------------------
+function listeFuellen(liste, auswahl) {
+  // Alte Karten entfernen, damit nichts doppelt erscheint
+  liste.textContent = "";
+  auswahl.forEach(function (test) {
+    liste.appendChild(karteBauen(test));
+  });
 }
 
 // ---------------------------------------------------------
 // Die ganze Seite zeichnen
 // ---------------------------------------------------------
 function anzeigen() {
-  const liste = document.getElementById("liste");
-  const leer = document.getElementById("leer");
-
-  // Alte Karten entfernen, damit nichts doppelt erscheint
-  liste.textContent = "";
-
-  // Ist die Liste leer, zeigen wir nur das grosse Quadrat
-  if (tests.length === 0) {
-    liste.hidden = true;
-    leer.hidden = false;
-    return;
-  }
-
-  liste.hidden = false;
-  leer.hidden = true;
-
   // Nach Datum sortieren: der nächste Test kommt zuerst.
   // slice() macht eine Kopie, damit die Originalliste bleibt, wie sie ist.
   const sortiert = tests.slice().sort(function (a, b) {
     return zuDatum(a.datum) - zuDatum(b.datum);
   });
 
-  // Für jeden Test eine Karte in die Liste hängen
-  sortiert.forEach(function (test) {
-    liste.appendChild(karteBauen(test));
+  // filter() teilt in kommende und vergangene Tests auf
+  const kommend = sortiert.filter(function (test) {
+    return !istVorbei(test);
   });
+  // Im Archiv steht der zuletzt geschriebene Test zuoberst
+  const vorbei = sortiert.filter(istVorbei).reverse();
+
+  // Kommende Tests – oder das grosse Quadrat, wenn keine da sind
+  const liste = document.getElementById("liste");
+  listeFuellen(liste, kommend);
+  liste.hidden = kommend.length === 0;
+  document.getElementById("leer").hidden = kommend.length > 0;
+
+  // Archiv
+  const archiv = document.getElementById("archiv");
+  listeFuellen(archiv, vorbei);
+  archiv.hidden = vorbei.length === 0;
+  document.getElementById("archiv-leer").hidden = vorbei.length > 0;
 }
 
 // ---------------------------------------------------------
-// Zwischen Liste und Formular wechseln
+// Zwischen den Seiten wechseln
 // ---------------------------------------------------------
+const TITEL = {
+  listenseite: "Die kommenden Tests",
+  formularseite: "Neuer Test",
+  archivseite: "Archiv"
+};
+
+// Zeigt eine Seite und versteckt die anderen
+function zeigeSeite(name) {
+  Object.keys(TITEL).forEach(function (seite) {
+    document.getElementById(seite).hidden = seite !== name;
+  });
+  document.getElementById("titel").textContent = TITEL[name];
+  // Der Plus-Balken gehört nur zur Liste
+  document.getElementById("balken-unten").hidden = name !== "listenseite";
+  window.scrollTo(0, 0);
+}
+
 function zeigeFormular() {
-  document.getElementById("listenseite").hidden = true;
-  document.getElementById("balken-unten").hidden = true;
-  document.getElementById("formularseite").hidden = false;
-  document.getElementById("titel").textContent = "Neuer Test";
+  zeigeSeite("formularseite");
   document.getElementById("fach").focus();
 }
 
 function zeigeListe() {
-  document.getElementById("formularseite").hidden = true;
-  document.getElementById("listenseite").hidden = false;
-  document.getElementById("balken-unten").hidden = false;
-  document.getElementById("titel").textContent = "Die kommenden Tests";
+  zeigeSeite("listenseite");
   // Formular leeren, damit es beim nächsten Mal frisch ist
   document.getElementById("formular").reset();
   document.getElementById("meldung").hidden = true;
@@ -208,7 +250,12 @@ function hinzufuegen(ereignis) {
 }
 
 document.getElementById("plus").addEventListener("click", zeigeFormular);
+document.getElementById("leer-plus").addEventListener("click", zeigeFormular);
 document.getElementById("zurueck").addEventListener("click", zeigeListe);
+document.getElementById("zum-archiv").addEventListener("click", function () {
+  zeigeSeite("archivseite");
+});
+document.getElementById("archiv-zurueck").addEventListener("click", zeigeListe);
 document.getElementById("formular").addEventListener("submit", hinzufuegen);
 
 // Los geht's

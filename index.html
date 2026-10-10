@@ -20,11 +20,21 @@
     <!-- Hier fügt script.js die Karten ein -->
     <ul id="liste" class="liste"></ul>
 
-    <!-- Wird nur gezeigt, wenn die Liste leer ist -->
+    <!-- Wird nur gezeigt, wenn keine kommenden Tests da sind.
+         Das Quadrat ist ein Knopf und öffnet das Formular. -->
     <div id="leer" class="leer" hidden>
-      <div class="leer-quadrat" aria-hidden="true">+</div>
+      <button type="button" id="leer-plus" class="leer-quadrat" aria-label="Test hinzufügen">+</button>
       <p class="leer-text">Trage deinen ersten Test ein</p>
     </div>
+
+    <button type="button" id="zum-archiv" class="knopf-leise archiv-link">Archiv ansehen</button>
+  </main>
+
+  <!-- Seite 3: das Archiv mit den vergangenen Tests -->
+  <main id="archivseite" class="inhalt" hidden>
+    <ul id="archiv" class="liste"></ul>
+    <p id="archiv-leer" class="leer-text leer">Noch keine vergangenen Tests.</p>
+    <button type="button" id="archiv-zurueck" class="knopf-leise archiv-link">Zurück</button>
   </main>
 
   <!-- Seite 2: das Formular. Versteckt, bis man auf das Plus klickt -->
