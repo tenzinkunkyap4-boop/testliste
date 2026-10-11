@@ -30,17 +30,36 @@ function speichern() {
 
 const tests = laden();
 
-// Ab so vielen Tagen oder weniger zeigen wir das Warnzeichen
+// Ab so vielen Tagen oder weniger zeigen wir den Lern-Hinweis
 const WARN_TAGE = 5;
 
 // ---------------------------------------------------------
 // Kleine Helfer rund ums Datum
 // ---------------------------------------------------------
 
+// Eigene Namenslisten, damit alles genau wie im Design aussieht.
+// getDay() zählt ab Sonntag (0), getMonth() ab Januar (0).
+const WOCHENTAGE = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+const MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+  "August", "September", "Oktober", "November", "Dezember"];
+
 // Macht aus "2026-10-11" ein Datum (Mitternacht, lokale Zeit)
 function zuDatum(text) {
   const teile = text.split("-").map(Number);
   return new Date(teile[0], teile[1] - 1, teile[2]);
+}
+
+// Das Gegenstück: macht aus einem Datum wieder "2026-10-11"
+function alsSchluessel(datum) {
+  const monat = String(datum.getMonth() + 1).padStart(2, "0");
+  const tag = String(datum.getDate()).padStart(2, "0");
+  return datum.getFullYear() + "-" + monat + "-" + tag;
+}
+
+// Heute um Mitternacht. Nur das Datum zählt, nicht die Uhrzeit.
+function heute() {
+  const jetzt = new Date();
+  return new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
 }
 
 // Schreibt ein Datum deutsch: 11.10.2026
@@ -52,11 +71,8 @@ function datumAlsText(datum) {
 
 // Zählt die ganzen Tage von heute bis zum Test
 function tageBis(datum) {
-  const jetzt = new Date();
-  // Nur das Datum zählt, nicht die Uhrzeit
-  const heute = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
   const msProTag = 24 * 60 * 60 * 1000;
-  return Math.round((datum - heute) / msProTag);
+  return Math.round((datum - heute()) / msProTag);
 }
 
 // Ein Test ist vorbei, wenn sein Datum vor heute liegt
@@ -64,77 +80,169 @@ function istVorbei(test) {
   return tageBis(zuDatum(test.datum)) < 0;
 }
 
-// Formuliert die Anzahl Tage als Satz
+// Formuliert die Anzahl Tage als Satz, für kommende und vergangene Tests
 function tageAlsText(tage) {
-  if (tage < 0) return "Test ist vorbei";
   if (tage === 0) return "Heute";
-  if (tage === 1) return "Noch 1 Tag";
+  if (tage === 1) return "Morgen";
+  if (tage === -1) return "Gestern";
+  if (tage < 0) return "Vor " + -tage + " Tagen";
   return "Noch " + tage + " Tage";
 }
 
 // ---------------------------------------------------------
-// Eine einzelne Karte bauen
+// Ein Löschen-Knopf mit Mülleimer-Symbol
+// ---------------------------------------------------------
+const MUELLEIMER =
+  '<svg class="symbol" viewBox="0 0 24 24" aria-hidden="true">' +
+  '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+
+function loeschenKnopf(test, extraKlasse) {
+  const knopf = document.createElement("button");
+  knopf.type = "button";
+  knopf.className = "loeschen " + (extraKlasse || "");
+  // Das Symbol ist fester Text von uns, darum ist innerHTML hier sicher
+  knopf.innerHTML = MUELLEIMER;
+  // Screenreader brauchen einen Namen, weil man nur ein Bild sieht
+  knopf.setAttribute("aria-label", "«" + test.fach + "» löschen");
+  knopf.addEventListener("click", function () {
+    loeschenTest(test);
+  });
+  return knopf;
+}
+
+// ---------------------------------------------------------
+// Eine kleine Karte (für «Später» und das Archiv)
 // ---------------------------------------------------------
 function karteBauen(test) {
   const datum = zuDatum(test.datum);
-  const tage = tageBis(datum);
 
   const karte = document.createElement("li");
   karte.className = "karte";
 
-  // Das Blatt: reine Optik, deshalb für Screenreader unsichtbar
-  const blatt = document.createElement("div");
-  blatt.className = "blatt";
-  blatt.setAttribute("aria-hidden", "true");
-  karte.appendChild(blatt);
+  // Das Datumsfeld links: Tag gross, Monat klein darunter
+  const feld = document.createElement("div");
+  feld.className = "datumsfeld";
+  feld.setAttribute("aria-hidden", "true");
+  const tag = document.createElement("span");
+  tag.className = "datumsfeld-tag";
+  tag.textContent = String(datum.getDate()).padStart(2, "0");
+  const monat = document.createElement("span");
+  monat.className = "datumsfeld-monat";
+  // slice(0, 3) nimmt die ersten drei Buchstaben: "Oktober" → "Okt"
+  monat.textContent = MONATE[datum.getMonth()].slice(0, 3);
+  feld.appendChild(tag);
+  feld.appendChild(monat);
+  karte.appendChild(feld);
 
-  // Die Angaben unter dem Blatt
+  // Die Angaben rechts daneben
   const angaben = document.createElement("div");
   angaben.className = "angaben";
 
-  const fach = document.createElement("h2");
+  const fach = document.createElement("h3");
   fach.className = "fach";
   fach.textContent = test.fach;
   angaben.appendChild(fach);
 
-  const datumZeile = document.createElement("p");
-  datumZeile.className = "datum";
-  datumZeile.textContent = datumAlsText(datum);
-  angaben.appendChild(datumZeile);
-
-  const tageZeile = document.createElement("p");
-  tageZeile.className = "tage";
-  tageZeile.textContent = tageAlsText(tage);
-  angaben.appendChild(tageZeile);
-
-  // Themen nur zeigen, wenn welche eingetragen sind
-  if (test.themen) {
-    const themenZeile = document.createElement("p");
-    themenZeile.className = "themen";
-    themenZeile.textContent = "Themen: " + test.themen;
-    angaben.appendChild(themenZeile);
-  }
-
-  // Warnzeichen nur, wenn der Test in 5 Tagen oder weniger ist
-  if (tage >= 0 && tage <= WARN_TAGE) {
-    const warnung = document.createElement("p");
-    warnung.className = "warnung";
-    warnung.textContent = "⚠️ Steht bald an";
-    angaben.appendChild(warnung);
-  }
-
-  // Knopf zum Löschen dieses einen Tests
-  const loeschen = document.createElement("button");
-  loeschen.type = "button";
-  loeschen.className = "loeschen";
-  loeschen.textContent = "Löschen";
-  loeschen.addEventListener("click", function () {
-    loeschenTest(test);
-  });
-  angaben.appendChild(loeschen);
+  // Tage und Themen stehen in einer Zeile, getrennt mit «·»
+  const zeile = document.createElement("p");
+  zeile.className = "unterzeile";
+  let text = tageAlsText(tageBis(datum));
+  if (test.themen) text += " · " + test.themen;
+  zeile.textContent = text;
+  // title zeigt das genaue Datum, wenn man mit der Maus darüber fährt
+  zeile.title = datumAlsText(datum);
+  angaben.appendChild(zeile);
 
   karte.appendChild(angaben);
+  karte.appendChild(loeschenKnopf(test));
   return karte;
+}
+
+// ---------------------------------------------------------
+// Die grosse blaue Karte für den nächsten Test
+// ---------------------------------------------------------
+function naechsterFuellen(test) {
+  const datum = zuDatum(test.datum);
+  const tage = tageBis(datum);
+
+  document.getElementById("naechster-fach").textContent = test.fach;
+
+  // "Fr, 16.10.2026 · Kundenkontakt"
+  let text = WOCHENTAGE[datum.getDay()].slice(0, 2) + ", " + datumAlsText(datum);
+  if (test.themen) text += " · " + test.themen;
+  document.getElementById("naechster-datum").textContent = text;
+
+  // Grosse Zahl rechts. Am Testtag steht statt der Zahl "Heute".
+  const zahl = document.getElementById("naechster-zahl");
+  const einheit = document.getElementById("naechster-einheit");
+  // Das Wort "Heute" ist breiter als eine Zahl, darum wird es kleiner
+  zahl.classList.toggle("zaehler-wort", tage === 0);
+  if (tage === 0) {
+    zahl.textContent = "Heute";
+    einheit.textContent = "";
+  } else {
+    zahl.textContent = tage;
+    einheit.textContent = tage === 1 ? "Tag" : "Tage";
+  }
+
+  // Der Lern-Hinweis erscheint nur, wenn der Test bald ist
+  document.getElementById("naechster-hinweis").hidden = tage > WARN_TAGE;
+
+  // Alten Löschen-Knopf ersetzen, damit er zum aktuellen Test gehört
+  const platz = document.getElementById("naechster-loeschen");
+  platz.textContent = "";
+  platz.appendChild(loeschenKnopf(test, "loeschen-hell"));
+}
+
+// ---------------------------------------------------------
+// Der Streifen mit den nächsten 7 Tagen
+// ---------------------------------------------------------
+function wocheFuellen(kommend) {
+  // Ein Set merkt sich alle Tage, an denen ein Test ist.
+  // has() fragt dann schnell nach: "Ist an diesem Tag ein Test?"
+  const testTage = new Set(kommend.map(function (test) {
+    return test.datum;
+  }));
+
+  const streifen = document.getElementById("woche-tage");
+  streifen.textContent = "";
+
+  for (let i = 0; i < 7; i++) {
+    const tag = heute();
+    // setDate rechnet über das Monatsende hinaus richtig weiter
+    tag.setDate(tag.getDate() + i);
+    const hatTest = testTage.has(alsSchluessel(tag));
+
+    const eintrag = document.createElement("li");
+    eintrag.className = "woche-tag";
+    if (i === 0) eintrag.classList.add("ist-heute");
+    if (hatTest) eintrag.classList.add("hat-test");
+
+    // Vorgelesen wird z. B. "Freitag 16. Oktober, Test"
+    let vorlesen = WOCHENTAGE[tag.getDay()] + " " + tag.getDate() + ". " + MONATE[tag.getMonth()];
+    if (i === 0) vorlesen += ", heute";
+    if (hatTest) vorlesen += ", Test";
+    eintrag.setAttribute("aria-label", vorlesen);
+
+    const kurz = document.createElement("span");
+    kurz.className = "woche-kurz";
+    kurz.textContent = WOCHENTAGE[tag.getDay()].slice(0, 2);
+
+    const nummer = document.createElement("span");
+    nummer.className = "woche-nummer";
+    nummer.textContent = tag.getDate();
+
+    // Kleine Beschriftung darunter: "Test" hat Vorrang vor "heute"
+    const notiz = document.createElement("span");
+    notiz.className = "woche-notiz";
+    if (hatTest) notiz.textContent = "Test";
+    else if (i === 0) notiz.textContent = "heute";
+
+    eintrag.appendChild(kurz);
+    eintrag.appendChild(nummer);
+    eintrag.appendChild(notiz);
+    streifen.appendChild(eintrag);
+  }
 }
 
 // ---------------------------------------------------------
@@ -165,6 +273,11 @@ function listeFuellen(liste, auswahl) {
 // Die ganze Seite zeichnen
 // ---------------------------------------------------------
 function anzeigen() {
+  // Heutiges Datum oben: "Sonntag, 11. Oktober"
+  const h = heute();
+  document.getElementById("heute").textContent =
+    WOCHENTAGE[h.getDay()] + ", " + h.getDate() + ". " + MONATE[h.getMonth()];
+
   // Nach Datum sortieren: der nächste Test kommt zuerst.
   // slice() macht eine Kopie, damit die Originalliste bleibt, wie sie ist.
   const sortiert = tests.slice().sort(function (a, b) {
@@ -178,11 +291,21 @@ function anzeigen() {
   // Im Archiv steht der zuletzt geschriebene Test zuoberst
   const vorbei = sortiert.filter(istVorbei).reverse();
 
-  // Kommende Tests – oder das grosse Quadrat, wenn keine da sind
-  const liste = document.getElementById("liste");
-  listeFuellen(liste, kommend);
-  liste.hidden = kommend.length === 0;
-  document.getElementById("leer").hidden = kommend.length > 0;
+  // Keine kommenden Tests: nur der leere Hinweis
+  const keine = kommend.length === 0;
+  document.getElementById("leer").hidden = !keine;
+  document.getElementById("naechster").hidden = keine;
+  document.getElementById("woche").hidden = keine;
+
+  if (!keine) {
+    naechsterFuellen(kommend[0]);
+    wocheFuellen(kommend);
+  }
+
+  // Alle ausser dem ersten kommen unter «Später»
+  const spaeter = kommend.slice(1);
+  listeFuellen(document.getElementById("liste"), spaeter);
+  document.getElementById("spaeter").hidden = spaeter.length === 0;
 
   // Archiv
   const archiv = document.getElementById("archiv");
@@ -194,20 +317,13 @@ function anzeigen() {
 // ---------------------------------------------------------
 // Zwischen den Seiten wechseln
 // ---------------------------------------------------------
-const TITEL = {
-  listenseite: "Die kommenden Tests",
-  formularseite: "Neuer Test",
-  archivseite: "Archiv"
-};
+const SEITEN = ["listenseite", "formularseite", "archivseite"];
 
 // Zeigt eine Seite und versteckt die anderen
 function zeigeSeite(name) {
-  Object.keys(TITEL).forEach(function (seite) {
+  SEITEN.forEach(function (seite) {
     document.getElementById(seite).hidden = seite !== name;
   });
-  document.getElementById("titel").textContent = TITEL[name];
-  // Der Plus-Balken gehört nur zur Liste
-  document.getElementById("balken-unten").hidden = name !== "listenseite";
   window.scrollTo(0, 0);
 }
 
@@ -237,9 +353,8 @@ function hinzufuegen(ereignis) {
 
   // Fehlt etwas, zeigen wir eine Meldung und speichern nichts
   if (fach === "" || datum === "") {
-    const meldung = document.getElementById("meldung");
-    meldung.textContent = "Bitte Fach und Datum ausfüllen.";
-    meldung.hidden = false;
+    document.getElementById("meldung-text").textContent = "Bitte Fach und Datum ausfüllen.";
+    document.getElementById("meldung").hidden = false;
     return;
   }
 
@@ -249,8 +364,7 @@ function hinzufuegen(ereignis) {
   zeigeListe();
 }
 
-document.getElementById("plus").addEventListener("click", zeigeFormular);
-document.getElementById("leer-plus").addEventListener("click", zeigeFormular);
+document.getElementById("neuer-test").addEventListener("click", zeigeFormular);
 document.getElementById("zurueck").addEventListener("click", zeigeListe);
 document.getElementById("zum-archiv").addEventListener("click", function () {
   zeigeSeite("archivseite");

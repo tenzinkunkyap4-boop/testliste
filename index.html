@@ -5,63 +5,123 @@
   <!-- Damit die Seite auf dem Handy richtig skaliert -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Die kommenden Tests</title>
+  <!-- Schrift von Google Fonts. preconnect baut die Verbindung früh auf,
+       damit die Schrift schneller da ist. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <!-- Relativer Pfad, damit es auch auf GitHub Pages funktioniert -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- Blauer Balken oben -->
-  <header class="balken">
-    <h1 id="titel" class="titel">Die kommenden Tests</h1>
-  </header>
-
-  <!-- Seite 1: die Liste -->
+  <!-- Seite 1: die Startseite mit den kommenden Tests -->
   <main id="listenseite" class="inhalt">
-    <!-- Hier fügt script.js die Karten ein -->
-    <ul id="liste" class="liste"></ul>
+    <header class="kopf">
+      <!-- script.js schreibt hier das heutige Datum hinein -->
+      <p id="heute" class="kopf-datum"></p>
+      <h1 class="titel">Die kommenden Tests</h1>
+    </header>
 
-    <!-- Wird nur gezeigt, wenn keine kommenden Tests da sind.
-         Das Quadrat ist ein Knopf und öffnet das Formular. -->
+    <!-- Die grosse blaue Karte für den nächsten Test -->
+    <section id="naechster" class="naechster" aria-labelledby="naechster-titel">
+      <div class="naechster-oben">
+        <h2 id="naechster-titel" class="etikett">Als Nächstes</h2>
+        <!-- Der Löschen-Knopf wird von script.js hier eingesetzt -->
+        <div id="naechster-loeschen"></div>
+      </div>
+      <div class="naechster-mitte">
+        <div>
+          <p id="naechster-fach" class="naechster-fach"></p>
+          <p id="naechster-datum" class="naechster-datum"></p>
+        </div>
+        <p class="zaehler">
+          <span id="naechster-zahl" class="zaehler-zahl"></span>
+          <span id="naechster-einheit" class="zaehler-einheit"></span>
+        </p>
+      </div>
+      <p id="naechster-hinweis" class="hinweis">
+        <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg>
+        Jetzt mit Lernen anfangen
+      </p>
+    </section>
+
+    <!-- Streifen mit den nächsten 7 Tagen -->
+    <section id="woche" class="woche" aria-labelledby="woche-titel">
+      <h2 id="woche-titel" class="woche-titel">Die nächsten 7 Tage</h2>
+      <ol id="woche-tage" class="woche-tage"></ol>
+    </section>
+
+    <!-- Alle anderen kommenden Tests -->
+    <section id="spaeter" aria-labelledby="spaeter-titel">
+      <h2 id="spaeter-titel" class="abschnitt">Später</h2>
+      <ul id="liste" class="liste"></ul>
+    </section>
+
+    <!-- Wird nur gezeigt, wenn keine kommenden Tests da sind -->
     <div id="leer" class="leer" hidden>
-      <button type="button" id="leer-plus" class="leer-quadrat" aria-label="Test hinzufügen">+</button>
-      <p class="leer-text">Trage deinen ersten Test ein</p>
+      <svg class="leer-symbol" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      <h2 class="leer-titel">Noch keine Tests</h2>
+      <p class="leer-text">Trag deinen ersten Test ein. Dann siehst du hier, wie viele Tage dir noch bleiben.</p>
     </div>
 
-    <button type="button" id="zum-archiv" class="knopf-leise archiv-link">Archiv ansehen</button>
+    <!-- Unten am Bildschirm: Archiv und Neuer Test -->
+    <div class="fuss">
+      <button type="button" id="zum-archiv" class="link">Archiv ansehen</button>
+      <button type="button" id="neuer-test" class="knopf">
+        <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Neuer Test
+      </button>
+    </div>
   </main>
 
-  <!-- Seite 3: das Archiv mit den vergangenen Tests -->
-  <main id="archivseite" class="inhalt" hidden>
-    <ul id="archiv" class="liste"></ul>
-    <p id="archiv-leer" class="leer-text leer">Noch keine vergangenen Tests.</p>
-    <button type="button" id="archiv-zurueck" class="knopf-leise archiv-link">Zurück</button>
-  </main>
-
-  <!-- Seite 2: das Formular. Versteckt, bis man auf das Plus klickt -->
+  <!-- Seite 2: das Formular -->
   <main id="formularseite" class="inhalt" hidden>
+    <header class="kopf">
+      <button type="button" id="zurueck" class="link zurueck">
+        <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        Zurück
+      </button>
+      <h1 class="titel">Neuer Test</h1>
+    </header>
+
     <!-- novalidate: Wir prüfen selbst und zeigen eine eigene Meldung -->
     <form id="formular" class="formular" novalidate>
       <label for="fach">Fach</label>
-      <input id="fach" type="text" autocomplete="off">
+      <input id="fach" type="text" autocomplete="off" placeholder="z. B. Deutsch">
 
       <label for="datum">Datum</label>
       <input id="datum" type="date">
 
-      <label for="themen">Themen</label>
-      <textarea id="themen" rows="4"></textarea>
+      <label for="themen">Themen <span class="freiwillig">(freiwillig)</span></label>
+      <textarea id="themen" rows="4" placeholder="z. B. Kundenkontakt"></textarea>
 
       <!-- role="alert": Screenreader lesen die Meldung sofort vor -->
-      <p id="meldung" class="meldung" role="alert" hidden></p>
+      <p id="meldung" class="meldung" role="alert" hidden>
+        <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg>
+        <span id="meldung-text"></span>
+      </p>
 
-      <button type="submit" class="knopf">Hinzufügen</button>
-      <button type="button" id="zurueck" class="knopf-leise">Zurück</button>
+      <div class="fuss">
+        <button type="submit" class="knopf knopf-breit">Hinzufügen</button>
+      </div>
     </form>
   </main>
 
-  <!-- Blauer Balken unten mit dem Plus-Knopf -->
-  <footer id="balken-unten" class="balken balken-unten">
-    <button type="button" id="plus" class="plus" aria-label="Test hinzufügen">+</button>
-  </footer>
+  <!-- Seite 3: das Archiv mit den vergangenen Tests -->
+  <main id="archivseite" class="inhalt" hidden>
+    <header class="kopf">
+      <button type="button" id="archiv-zurueck" class="link zurueck">
+        <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        Zurück
+      </button>
+      <h1 class="titel">Archiv</h1>
+      <p class="untertitel">Vergangene Tests, der neueste zuerst</p>
+    </header>
+
+    <ul id="archiv" class="liste"></ul>
+    <p id="archiv-leer" class="untertitel">Noch keine vergangenen Tests.</p>
+  </main>
 
   <!-- Das Skript steht am Ende, damit das HTML vorher fertig geladen ist -->
   <script src="script.js"></script>
