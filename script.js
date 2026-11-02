@@ -525,6 +525,10 @@ async function notfallplanAnfragen(daten) {
     });
     await warten(1500);
     if (TESTMODUS === "fehler") throw new Error("Für heute sind alle 3 Anfragen aufgebraucht.");
+    // ?test=unbrauchbar: So antwortet die KI, wenn die Eingabe nichts zum Lernen enthält
+    if (TESTMODUS === "unbrauchbar") {
+      return ergebnisPruefen({ text: "FEHLER: Auf dem Foto sind keine Lernziele zu erkennen.", abgeschnitten: false, uebrig: 2 });
+    }
     return { text: BEISPIEL_ANTWORT, abgeschnitten: false, uebrig: 2 };
   }
 
@@ -554,6 +558,18 @@ async function notfallplanAnfragen(daten) {
   if (ergebnis.fehler) throw new Error(ergebnis.fehler);
   if (!antwort.ok || !ergebnis.text) {
     throw new Error("Etwas ist schiefgelaufen. Versuch es später noch einmal.");
+  }
+  return ergebnisPruefen(ergebnis);
+}
+
+// Beginnt die Antwort mit «FEHLER:», konnte die KI mit der Eingabe
+// nichts anfangen. Dann ist es kein Plan, sondern eine Fehlermeldung.
+// (Der Server fängt das schon ab, das hier ist die Sicherung.)
+function ergebnisPruefen(ergebnis) {
+  const text = ergebnis.text.trim();
+  if (text.startsWith("FEHLER:")) {
+    const grund = text.slice("FEHLER:".length).trim();
+    throw new Error(grund || "Die Eingabe enthält keine brauchbaren Lernziele.");
   }
   return ergebnis;
 }
