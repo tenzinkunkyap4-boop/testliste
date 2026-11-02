@@ -295,18 +295,29 @@ button {
   font-weight: 600;
 }
 
-/* Weisse Pille mit dem Lern-Hinweis */
+/* Weisser Warn-Knopf «Jetzt Notfallplan erstellen» */
 .hinweis {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-height: 36px;
   margin-top: 14px;
   padding: 6px 14px;
+  border: 0;
   border-radius: 999px;
   background: #ffffff;
   color: var(--blau);
   font-size: 14px;
   font-weight: 700;
+  cursor: pointer;
+}
+
+.hinweis:hover {
+  background: var(--blau-hell);
+}
+
+.hinweis:focus-visible {
+  outline-color: #ffffff;
 }
 
 /* ---------------------------------------------------------
@@ -551,6 +562,188 @@ button {
   color: var(--warnung-text);
   font-size: 14px;
   font-weight: 500;
+}
+
+/* ---------------------------------------------------------
+   Notfallplan
+   --------------------------------------------------------- */
+
+/* Kleiner Knopf «Notfallplan» auf den Karten */
+.notfall-knopf {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  margin-top: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--blau);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--blau);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.notfall-knopf:hover {
+  background: var(--blau-hell);
+}
+
+/* Auf der blauen Karte: durchsichtig mit weissem Rand */
+.notfall-knopf-hell {
+  margin-top: 14px;
+  border-color: #ffffff;
+  background: transparent;
+  color: #ffffff;
+}
+
+.notfall-knopf-hell:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.notfall-knopf-hell:focus-visible {
+  outline-color: #ffffff;
+}
+
+/* Hinweis und Notfallplan-Knopf stehen nebeneinander, wenn Platz ist */
+#naechster-notfall {
+  display: inline-block;
+  vertical-align: top;
+}
+
+/* Ladeanzeige: ein drehender Kreis mit Text */
+.laden {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 0;
+  color: var(--grau);
+  font-weight: 600;
+  text-align: center;
+}
+
+.kreisel {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--blau-hell);
+  border-top-color: var(--blau);
+  border-radius: 50%;
+  animation: drehen 0.9s linear infinite;
+}
+
+@keyframes drehen {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Die grosse weisse Lernkarte */
+.lernkarte {
+  padding: 24px 20px;
+  border: 1px solid var(--linie);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+.lernkarte-zaehler {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blau);
+}
+
+.lernkarte-titel {
+  margin-top: 10px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.lernkarte-text {
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 1.6;
+  /* Zeilenumbrüche aus dem Text der KI bleiben erhalten */
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Zweiter Knopf: hellblau statt voll blau */
+.knopf-zweit {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 20px;
+  border: none;
+  border-radius: 14px;
+  background: var(--blau-hell);
+  color: var(--blau);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.knopf-zweit:hover {
+  background: #dbe5fd;
+}
+
+.loesung {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--linie);
+}
+
+.loesung-etikett {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--grau);
+}
+
+.loesung .lernkarte-text {
+  margin-top: 6px;
+}
+
+.ki-hinweis {
+  margin: 10px 4px 0;
+  font-size: 12px;
+  color: var(--grau);
+}
+
+#neu-erstellen {
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+/* Unten auf der Plan-Seite: zwei Knöpfe nebeneinander */
+#planseite .fuss {
+  gap: 12px;
+}
+
+#planseite .fuss .knopf {
+  flex: 1;
+}
+
+/* Heller Knopf mit grauem Rand, z. B. «Zurück» */
+.knopf-hell {
+  border: 1px solid var(--linie);
+  background: #ffffff;
+  color: var(--text);
+}
+
+.knopf-hell:hover {
+  background: var(--grau-hell);
+}
+
+.knopf:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.knopf-hell:disabled:hover {
+  background: #ffffff;
 }
 
 /* ---------------------------------------------------------

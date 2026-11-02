@@ -113,7 +113,7 @@ function loeschenKnopf(test, extraKlasse) {
 // ---------------------------------------------------------
 // Eine kleine Karte (für «Später» und das Archiv)
 // ---------------------------------------------------------
-function karteBauen(test) {
+function karteBauen(test, mitNotfallplan) {
   const datum = zuDatum(test.datum);
 
   const karte = document.createElement("li");
@@ -153,6 +153,9 @@ function karteBauen(test) {
   zeile.title = datumAlsText(datum);
   angaben.appendChild(zeile);
 
+  // Nur kommende Tests bekommen einen Notfallplan-Knopf
+  if (mitNotfallplan) angaben.appendChild(notfallKnopf(test, "notfall-knopf"));
+
   karte.appendChild(angaben);
   karte.appendChild(loeschenKnopf(test));
   return karte;
@@ -185,13 +188,30 @@ function naechsterFuellen(test) {
     einheit.textContent = tage === 1 ? "Tag" : "Tage";
   }
 
-  // Der Lern-Hinweis erscheint nur, wenn der Test bald ist
-  document.getElementById("naechster-hinweis").hidden = tage > WARN_TAGE;
+  // Ist der Test bald (5 Tage oder weniger), wird die Warnung zum Knopf
+  const bald = tage <= WARN_TAGE;
+  const warnKnopf = document.getElementById("naechster-hinweis");
+  warnKnopf.hidden = !bald;
+  // Gibt es schon einen Plan, öffnet der Knopf ihn direkt
+  document.getElementById("naechster-hinweis-text").textContent =
+    test.notfallplan ? "Notfallplan öffnen" : "Jetzt Notfallplan erstellen";
+  // onclick (statt addEventListener), damit beim Neuzeichnen nur ein Klick-Befehl dran ist
+  warnKnopf.onclick = function () {
+    notfallOeffnen(test);
+  };
 
   // Alten Löschen-Knopf ersetzen, damit er zum aktuellen Test gehört
   const platz = document.getElementById("naechster-loeschen");
   platz.textContent = "";
   platz.appendChild(loeschenKnopf(test, "loeschen-hell"));
+
+  // Gleich beim Notfallplan-Knopf: den normalen Knopf gibt es nur,
+  // wenn der Test noch weit weg ist (sonst übernimmt der Warn-Knopf)
+  const notfallPlatz = document.getElementById("naechster-notfall");
+  notfallPlatz.textContent = "";
+  if (!bald) {
+    notfallPlatz.appendChild(notfallKnopf(test, "notfall-knopf notfall-knopf-hell"));
+  }
 }
 
 // ---------------------------------------------------------
@@ -261,11 +281,11 @@ function loeschenTest(test) {
 // ---------------------------------------------------------
 // Karten in eine Liste füllen
 // ---------------------------------------------------------
-function listeFuellen(liste, auswahl) {
+function listeFuellen(liste, auswahl, mitNotfallplan) {
   // Alte Karten entfernen, damit nichts doppelt erscheint
   liste.textContent = "";
   auswahl.forEach(function (test) {
-    liste.appendChild(karteBauen(test));
+    liste.appendChild(karteBauen(test, mitNotfallplan));
   });
 }
 
@@ -304,7 +324,7 @@ function anzeigen() {
 
   // Alle ausser dem ersten kommen unter «Später»
   const spaeter = kommend.slice(1);
-  listeFuellen(document.getElementById("liste"), spaeter);
+  listeFuellen(document.getElementById("liste"), spaeter, true);
   document.getElementById("spaeter").hidden = spaeter.length === 0;
 
   // Archiv
@@ -317,7 +337,7 @@ function anzeigen() {
 // ---------------------------------------------------------
 // Zwischen den Seiten wechseln
 // ---------------------------------------------------------
-const SEITEN = ["listenseite", "formularseite", "archivseite"];
+const SEITEN = ["listenseite", "formularseite", "archivseite", "notfallseite", "planseite"];
 
 // Zeigt eine Seite und versteckt die anderen
 function zeigeSeite(name) {
@@ -363,6 +383,399 @@ function hinzufuegen(ereignis) {
   anzeigen();
   zeigeListe();
 }
+
+// =========================================================
+// NOTFALLPLAN
+// Die App schickt Fach, Tage, Lernziele und Muster an unseren
+// Server. Der fragt Claude und schickt einen Text zurück:
+// zuerst Lernkarten, dann «Übungen», dann «Lösungen».
+// =========================================================
+
+const SERVER_ADRESSE = "https://testliste-server.testliste.workers.dev";
+
+// Gleiche Grenze wie auf dem Server
+const MAX_ZEICHEN = 10000;
+
+// Testmodus: Hängt man ?test an die Adresse (index.html?test),
+// kommt eine feste Beispielantwort statt einer echten Anfrage.
+// So verbraucht das Ausprobieren keine der 3 Anfragen pro Tag.
+// Mit ?test=fehler sieht man, wie eine Fehlermeldung aussieht.
+const TESTMODUS = new URLSearchParams(location.search).get("test");
+
+const BEISPIEL_ANTWORT =
+  "Unterversicherung führt zu Kürzung\n" +
+  "Die Versicherungssumme ist kleiner als der echte Wert. Dann zahlt die Versicherung nur einen Teil. " +
+  "Formel: Versicherungssumme ÷ Wert × Schaden.\n" +
+  "Beispiel: Wert 100'000, Summe 75'000, Schaden 90'000 Franken. Die Versicherung zahlt 67'500 Franken.\n" +
+  "\n" +
+  "Überversicherung bringt nichts\n" +
+  "Ist die Summe höher als der Wert, zahlt die Versicherung trotzdem nur den echten Schaden. " +
+  "Man bezahlt also zu viel Prämie.\n" +
+  "Beispiel: Velo wert 800 Franken, versichert für 1'200. Bei Diebstahl gibt es 800 Franken.\n" +
+  "\n" +
+  "Selbstbehalt zahlst du selbst\n" +
+  "Der Selbstbehalt ist der Teil des Schadens, den du immer selbst trägst. " +
+  "Er wird vom Betrag abgezogen, den die Versicherung zahlt.\n" +
+  "Beispiel: Schaden 1'000 Franken, Selbstbehalt 200. Die Versicherung zahlt 800 Franken.\n" +
+  "\n" +
+  "Übungen\n" +
+  "1. Ein Hausrat ist 60'000 Franken wert und für 45'000 versichert. " +
+  "Ein Brand verursacht 20'000 Franken Schaden. Wie viel zahlt die Versicherung?\n" +
+  "2. Ein Laptop ist 1'500 Franken wert und für 2'000 versichert. " +
+  "Er wird gestohlen. Wie viel zahlt die Versicherung?\n" +
+  "3. Schaden 3'000 Franken, keine Unterversicherung, Selbstbehalt 500 Franken. " +
+  "Wie viel zahlt die Versicherung?\n" +
+  "\n" +
+  "Lösungen\n" +
+  "1. 45'000 ÷ 60'000 × 20'000 = 15'000 Franken. Es ist eine Unterversicherung, darum wird gekürzt. " +
+  "Häufiger Fehler: Man rechnet mit der Versicherungssumme statt mit dem Wert.\n" +
+  "2. 1'500 Franken. Bezahlt wird nur der echte Wert. " +
+  "Häufiger Fehler: Man meint, es gibt die ganze Versicherungssumme.\n" +
+  "3. 3'000 − 500 = 2'500 Franken. Der Selbstbehalt wird abgezogen. " +
+  "Häufiger Fehler: Man zieht den Selbstbehalt zweimal ab oder vergisst ihn.";
+
+// Was gerade auf der Plan-Seite zu sehen ist
+let planTest = null;      // der Test, zu dem der Plan gehört
+let planSchritte = [];    // alle Karten und Übungen hintereinander
+let planStelle = 0;       // welcher Schritt gerade angezeigt wird
+let uebrigeAnfragen = null; // nur direkt nach einer neuen Anfrage bekannt
+
+// Der Knopf «Notfallplan» auf jeder kommenden Karte
+function notfallKnopf(test, klassen) {
+  const knopf = document.createElement("button");
+  knopf.type = "button";
+  knopf.className = klassen;
+  // Gibt es schon einen gespeicherten Plan, öffnen wir ihn direkt
+  knopf.textContent = test.notfallplan ? "Notfallplan öffnen" : "Notfallplan";
+  knopf.addEventListener("click", function () {
+    notfallOeffnen(test);
+  });
+  return knopf;
+}
+
+// Führt zum Notfallplan: fertigen Plan zeigen oder Eingabe öffnen
+function notfallOeffnen(test) {
+  if (test.notfallplan) zeigePlan(test);
+  else zeigeNotfallEingabe(test);
+}
+
+// Kurzer Text oben, z. B. "Mathematik · Noch 3 Tage"
+function testInfo(test) {
+  return test.fach + " · " + tageAlsText(tageBis(zuDatum(test.datum)));
+}
+
+// ---------------------------------------------------------
+// Eingabeseite
+// ---------------------------------------------------------
+function zeigeNotfallEingabe(test) {
+  planTest = test;
+  document.getElementById("notfall-info").textContent = testInfo(test);
+
+  // Felder vorausfüllen: frühere Eingabe oder die Themen vom Test
+  const frueher = test.notfallplan || {};
+  document.getElementById("lernziele").value = frueher.lernziele || test.themen || "";
+  document.getElementById("muster").value = frueher.muster || "";
+
+  document.getElementById("notfall-meldung").hidden = true;
+  document.getElementById("notfall-formular").hidden = false;
+  document.getElementById("laden").hidden = true;
+
+  zeigeSeite("notfallseite");
+  document.getElementById("lernziele").focus();
+}
+
+function notfallMeldung(text) {
+  document.getElementById("notfall-meldung-text").textContent = text;
+  document.getElementById("notfall-meldung").hidden = false;
+}
+
+// Kleine Pause für den Testmodus, damit man die Ladeanzeige sieht
+function warten(ms) {
+  return new Promise(function (fertig) {
+    setTimeout(fertig, ms);
+  });
+}
+
+// Fragt den Server. Gibt { text, abgeschnitten, uebrig } zurück
+// oder wirft einen Fehler mit einem Satz, den man verstehen kann.
+async function notfallplanAnfragen(daten) {
+  if (TESTMODUS !== null) {
+    await warten(1500);
+    if (TESTMODUS === "fehler") throw new Error("Für heute sind alle 3 Anfragen aufgebraucht.");
+    return { text: BEISPIEL_ANTWORT, abgeschnitten: false, uebrig: 2 };
+  }
+
+  let antwort;
+  try {
+    antwort = await fetch(SERVER_ADRESSE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(daten),
+    });
+  } catch (fehler) {
+    // fetch scheitert ganz, wenn es keine Verbindung gibt
+    throw new Error("Keine Verbindung zum Server. Bist du online?");
+  }
+
+  let ergebnis = {};
+  try {
+    ergebnis = await antwort.json();
+  } catch (fehler) {
+    // Antwort war kein JSON: unten kommt eine allgemeine Meldung
+  }
+
+  // 403 heisst: Die Anfrage kam nicht von der GitHub-Seite
+  if (antwort.status === 403) {
+    throw new Error("Der Notfallplan funktioniert nur auf der Seite im Internet (GitHub).");
+  }
+  if (ergebnis.fehler) throw new Error(ergebnis.fehler);
+  if (!antwort.ok || !ergebnis.text) {
+    throw new Error("Etwas ist schiefgelaufen. Versuch es später noch einmal.");
+  }
+  return ergebnis;
+}
+
+async function notfallplanErstellen(ereignis) {
+  ereignis.preventDefault();
+
+  const lernziele = document.getElementById("lernziele").value.trim();
+  const muster = document.getElementById("muster").value.trim();
+
+  if (lernziele === "") {
+    notfallMeldung("Bitte die Lernziele ausfüllen.");
+    return;
+  }
+  if (lernziele.length + muster.length > MAX_ZEICHEN) {
+    notfallMeldung("Zu viel Text: höchstens 10'000 Zeichen zusammen.");
+    return;
+  }
+
+  // Formular verstecken, Ladeanzeige zeigen
+  document.getElementById("notfall-meldung").hidden = true;
+  document.getElementById("notfall-formular").hidden = true;
+  document.getElementById("laden").hidden = false;
+
+  const test = planTest;
+  try {
+    const ergebnis = await notfallplanAnfragen({
+      fach: test.fach,
+      tage: tageBis(zuDatum(test.datum)),
+      lernziele: lernziele,
+      muster: muster,
+    });
+
+    // Beim Test speichern, damit man ihn ohne neue Anfrage wieder öffnet
+    test.notfallplan = {
+      text: ergebnis.text,
+      abgeschnitten: ergebnis.abgeschnitten === true,
+      lernziele: lernziele,
+      muster: muster,
+      erstellt: alsSchluessel(heute()),
+    };
+    speichern();
+    anzeigen();
+
+    uebrigeAnfragen = ergebnis.uebrig;
+    // Nur hinwechseln, wenn man noch auf der Warte-Seite ist
+    if (!document.getElementById("notfallseite").hidden) zeigePlan(test);
+  } catch (fehler) {
+    // Zurück zum Formular, die Eingaben bleiben stehen
+    document.getElementById("laden").hidden = true;
+    document.getElementById("notfall-formular").hidden = false;
+    notfallMeldung(fehler.message);
+  }
+}
+
+// ---------------------------------------------------------
+// Den Text der KI in Karten und Übungen zerlegen
+// ---------------------------------------------------------
+
+// Teilt Zeilen bei Leerzeilen in Blöcke: [["Titel", "Text"], [...]]
+function inBloecke(zeilen) {
+  const bloecke = [];
+  let block = [];
+  zeilen.forEach(function (zeile) {
+    if (zeile.trim() === "") {
+      if (block.length > 0) bloecke.push(block);
+      block = [];
+    } else {
+      block.push(zeile.trim());
+    }
+  });
+  if (block.length > 0) bloecke.push(block);
+  return bloecke;
+}
+
+// Teilt Zeilen in nummerierte Einträge ("1. …", "2) …").
+// Ohne Nummern wird bei Leerzeilen getrennt.
+function inNummern(zeilen) {
+  const nummer = /^\s*(übung\s*)?\d+\s*[.):]\s*/i;
+  const hatNummern = zeilen.some(function (zeile) {
+    return nummer.test(zeile);
+  });
+  if (!hatNummern) {
+    return inBloecke(zeilen).map(function (block) {
+      return block.join("\n");
+    });
+  }
+
+  const eintraege = [];
+  zeilen.forEach(function (zeile) {
+    if (zeile.trim() === "") return;
+    if (nummer.test(zeile)) {
+      // Neue Nummer: neuer Eintrag, die Nummer selbst lassen wir weg
+      eintraege.push(zeile.replace(nummer, "").trim());
+    } else if (eintraege.length > 0) {
+      // Folgezeile: an den letzten Eintrag anhängen
+      eintraege[eintraege.length - 1] += "\n" + zeile.trim();
+    }
+  });
+  return eintraege;
+}
+
+function planZerlegen(text) {
+  // Markdown-Zeichen weg, falls die KI welche schreibt (**fett**, # Titel)
+  const sauber = text.replace(/\r/g, "").replace(/\*\*/g, "").replace(/^#+\s*/gm, "");
+  const zeilen = sauber.split("\n");
+
+  // Die Zeilen «Übungen» und «Lösungen» suchen
+  function findeUeberschrift(wort) {
+    return zeilen.findIndex(function (zeile) {
+      const z = zeile.trim().toLowerCase();
+      return z.startsWith(wort) && z.length < 25;
+    });
+  }
+  const stelleLoesungen = findeUeberschrift("lösungen");
+
+  // Wo beginnen die Übungen? Entweder bei der Überschrift «Übungen»
+  // oder (ohne Überschrift) bei der ersten Zeile «Übung 1: …».
+  // kartenEnde: bis hier gehen die Karten
+  // uebungenStart: ab hier stehen die Übungen selbst
+  let kartenEnde = findeUeberschrift("übungen");
+  let uebungenStart = kartenEnde + 1;
+  if (kartenEnde < 0) {
+    kartenEnde = zeilen.findIndex(function (zeile) {
+      return /^\s*übung\s*\d/i.test(zeile);
+    });
+    uebungenStart = kartenEnde;
+  }
+  if (kartenEnde < 0) kartenEnde = stelleLoesungen >= 0 ? stelleLoesungen : zeilen.length;
+
+  const karten = inBloecke(zeilen.slice(0, kartenEnde)).map(function (block) {
+    // "Karte 1:" am Anfang lassen wir weg, die Nummer steht schon oben
+    const titel = block[0].replace(/^karte\s*\d+\s*[.):]\s*/i, "");
+    // Erste Zeile ist der Titel, der Rest die Erklärung
+    if (block.length === 1) return { titel: "", text: titel };
+    return { titel: titel, text: block.slice(1).join("\n") };
+  });
+
+  let uebungen = [];
+  let loesungen = [];
+  if (uebungenStart > 0) {
+    const uebungenEnde = stelleLoesungen > uebungenStart ? stelleLoesungen : zeilen.length;
+    uebungen = inNummern(zeilen.slice(uebungenStart, uebungenEnde));
+    if (stelleLoesungen > uebungenStart) {
+      loesungen = inNummern(zeilen.slice(stelleLoesungen + 1));
+    }
+  }
+
+  // Alles in eine Reihe: zuerst die Karten, dann die Übungen
+  const schritte = karten.map(function (karte, i) {
+    return { art: "karte", nummer: i + 1, anzahl: karten.length, titel: karte.titel, text: karte.text };
+  });
+  uebungen.forEach(function (uebung, i) {
+    schritte.push({
+      art: "uebung",
+      nummer: i + 1,
+      anzahl: uebungen.length,
+      titel: "Übung " + (i + 1),
+      text: uebung,
+      loesung: loesungen[i] || "Zu dieser Übung fehlt die Lösung.",
+    });
+  });
+
+  // Nichts erkannt? Dann den ganzen Text als eine Karte zeigen
+  if (schritte.length === 0) {
+    schritte.push({ art: "karte", nummer: 1, anzahl: 1, titel: "", text: text });
+  }
+  return schritte;
+}
+
+// ---------------------------------------------------------
+// Plan-Seite: eine Karte oder Übung nach der anderen
+// ---------------------------------------------------------
+function zeigePlan(test) {
+  planTest = test;
+  planSchritte = planZerlegen(test.notfallplan.text);
+  planStelle = 0;
+
+  document.getElementById("plan-titel").textContent = "Notfallplan " + test.fach;
+
+  // Unter dem Titel: Datum und allenfalls wichtige Hinweise
+  let info = "Erstellt am " + datumAlsText(zuDatum(test.notfallplan.erstellt));
+  if (test.notfallplan.abgeschnitten) info += " · Die Antwort war zu lang und wurde gekürzt.";
+  if (uebrigeAnfragen !== null && uebrigeAnfragen !== undefined) {
+    info += " · Heute noch " + uebrigeAnfragen + (uebrigeAnfragen === 1 ? " Anfrage" : " Anfragen") + " übrig.";
+  }
+  uebrigeAnfragen = null; // nur einmal direkt nach dem Erstellen zeigen
+  document.getElementById("plan-info").textContent = info;
+
+  zeigeSeite("planseite");
+  schrittZeigen();
+}
+
+function schrittZeigen() {
+  const schritt = planSchritte[planStelle];
+  const istUebung = schritt.art === "uebung";
+
+  document.getElementById("plan-zaehler").textContent =
+    (istUebung ? "Übung " : "Karte ") + schritt.nummer + " von " + schritt.anzahl;
+  // Bei Übungen steht die Nummer schon oben, darum kein extra Titel
+  const kopf = document.getElementById("plan-kopf");
+  kopf.textContent = istUebung ? "" : schritt.titel;
+  kopf.hidden = kopf.textContent === "";
+  document.getElementById("plan-text").textContent = schritt.text;
+
+  // Lösung zuerst verstecken
+  document.getElementById("loesung-zeigen").hidden = !istUebung;
+  document.getElementById("loesung").hidden = true;
+  document.getElementById("loesung-text").textContent = istUebung ? schritt.loesung : "";
+
+  // Knöpfe unten: Zurück nur, wenn es einen Schritt davor gibt
+  document.getElementById("plan-vor").disabled = planStelle === 0;
+  const weiter = document.getElementById("plan-weiter");
+  const naechster = planSchritte[planStelle + 1];
+  if (!naechster) weiter.textContent = "Fertig";
+  else if (!istUebung && naechster.art === "uebung") weiter.textContent = "Zu den Übungen";
+  else weiter.textContent = "Weiter";
+
+  window.scrollTo(0, 0);
+}
+
+document.getElementById("plan-vor").addEventListener("click", function () {
+  if (planStelle > 0) {
+    planStelle--;
+    schrittZeigen();
+  }
+});
+document.getElementById("plan-weiter").addEventListener("click", function () {
+  if (planStelle < planSchritte.length - 1) {
+    planStelle++;
+    schrittZeigen();
+  } else {
+    zeigeListe();
+  }
+});
+document.getElementById("loesung-zeigen").addEventListener("click", function () {
+  document.getElementById("loesung").hidden = false;
+  document.getElementById("loesung-zeigen").hidden = true;
+});
+document.getElementById("neu-erstellen").addEventListener("click", function () {
+  zeigeNotfallEingabe(planTest);
+});
+document.getElementById("notfall-zurueck").addEventListener("click", zeigeListe);
+document.getElementById("plan-zurueck").addEventListener("click", zeigeListe);
+document.getElementById("notfall-formular").addEventListener("submit", notfallplanErstellen);
 
 document.getElementById("neuer-test").addEventListener("click", zeigeFormular);
 document.getElementById("zurueck").addEventListener("click", zeigeListe);

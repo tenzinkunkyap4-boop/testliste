@@ -40,10 +40,13 @@
           <span id="naechster-einheit" class="zaehler-einheit"></span>
         </p>
       </div>
-      <p id="naechster-hinweis" class="hinweis">
+      <!-- Warn-Knopf: erscheint nur, wenn der Test in 5 Tagen oder weniger ist -->
+      <button type="button" id="naechster-hinweis" class="hinweis">
         <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg>
-        Jetzt mit Lernen anfangen
-      </p>
+        <span id="naechster-hinweis-text">Jetzt Notfallplan erstellen</span>
+      </button>
+      <!-- Der normale Notfallplan-Knopf (mehr als 5 Tage) wird von script.js hier eingesetzt -->
+      <div id="naechster-notfall"></div>
     </section>
 
     <!-- Streifen mit den nächsten 7 Tagen -->
@@ -121,6 +124,76 @@
 
     <ul id="archiv" class="liste"></ul>
     <p id="archiv-leer" class="untertitel">Noch keine vergangenen Tests.</p>
+  </main>
+
+  <!-- Seite 4: Eingabe für den Notfallplan -->
+  <main id="notfallseite" class="inhalt" hidden>
+    <header class="kopf">
+      <button type="button" id="notfall-zurueck" class="link zurueck">
+        <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        Zurück
+      </button>
+      <h1 class="titel">Notfallplan</h1>
+      <!-- script.js schreibt hier z. B. "Mathematik · noch 3 Tage" hinein -->
+      <p id="notfall-info" class="untertitel"></p>
+    </header>
+
+    <form id="notfall-formular" class="formular" novalidate>
+      <label for="lernziele">Lernziele</label>
+      <textarea id="lernziele" rows="5" placeholder="z. B. Unterversicherung berechnen, Arten von Versicherungen"></textarea>
+
+      <label for="muster">Muster <span class="freiwillig">(optional)</span></label>
+      <textarea id="muster" rows="6" placeholder="Text aus einem Übungsblatt oder alten Test hineinkopieren"></textarea>
+
+      <p id="notfall-meldung" class="meldung" role="alert" hidden>
+        <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg>
+        <span id="notfall-meldung-text"></span>
+      </p>
+
+      <div class="fuss">
+        <button type="submit" class="knopf knopf-breit">Notfallplan erstellen</button>
+      </div>
+    </form>
+
+    <!-- Ladeanzeige, solange der Server arbeitet -->
+    <div id="laden" class="laden" hidden>
+      <span class="kreisel" aria-hidden="true"></span>
+      <p role="status">Dein Notfallplan wird erstellt …</p>
+    </div>
+  </main>
+
+  <!-- Seite 5: der fertige Notfallplan (Karten, dann Übungen) -->
+  <main id="planseite" class="inhalt" hidden>
+    <header class="kopf">
+      <button type="button" id="plan-zurueck" class="link zurueck">
+        <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        Zurück
+      </button>
+      <h1 id="plan-titel" class="titel">Notfallplan</h1>
+      <p id="plan-info" class="untertitel"></p>
+    </header>
+
+    <!-- Eine einzige Karte, deren Inhalt script.js austauscht -->
+    <article class="lernkarte">
+      <p id="plan-zaehler" class="lernkarte-zaehler"></p>
+      <h2 id="plan-kopf" class="lernkarte-titel"></h2>
+      <p id="plan-text" class="lernkarte-text"></p>
+
+      <!-- Nur bei Übungen: Knopf und versteckte Lösung -->
+      <button type="button" id="loesung-zeigen" class="knopf-zweit" hidden>Lösung zeigen</button>
+      <div id="loesung" class="loesung" hidden>
+        <p class="loesung-etikett">Lösung</p>
+        <p id="loesung-text" class="lernkarte-text"></p>
+      </div>
+    </article>
+    <p class="ki-hinweis">Die KI kann Fehler machen. Vergleiche mit deinen Unterlagen.</p>
+
+    <button type="button" id="neu-erstellen" class="link">Notfallplan neu erstellen</button>
+
+    <div class="fuss">
+      <button type="button" id="plan-vor" class="knopf knopf-hell">Zurück</button>
+      <button type="button" id="plan-weiter" class="knopf">Weiter</button>
+    </div>
   </main>
 
   <!-- Das Skript steht am Ende, damit das HTML vorher fertig geladen ist -->
