@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <!-- Relativer Pfad, damit es auch auf GitHub Pages funktioniert -->
-  <!-- ?v=2 ist die Versionsnummer: Bei jedem Update erhöhen (hier UND unten bei script.js),
+  <!-- ?v=3 ist die Versionsnummer: Bei jedem Update erhöhen (hier UND unten bei script.js),
        dann lädt das Handy sicher die neue Datei statt der alten aus dem Speicher -->
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -143,9 +143,30 @@
     <form id="notfall-formular" class="formular" novalidate>
       <label for="lernziele">Lernziele</label>
       <textarea id="lernziele" rows="5" placeholder="z. B. Unterversicherung berechnen, Arten von Versicherungen"></textarea>
+      <!-- script.js zeigt hier die hinzugefügten Dateien (Name + «Entfernen») -->
+      <ul id="lernziele-dateien" class="datei-liste"></ul>
+      <button type="button" class="datei-knopf" data-feld="lernziele">
+        <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Datei hinzufügen
+      </button>
 
       <label for="muster">Muster <span class="freiwillig">(optional)</span></label>
       <textarea id="muster" rows="6" placeholder="Text aus einem Übungsblatt oder alten Test hineinkopieren"></textarea>
+      <ul id="muster-dateien" class="datei-liste"></ul>
+      <button type="button" class="datei-knopf" data-feld="muster">
+        <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Datei hinzufügen
+      </button>
+
+      <!-- Ein einziges, unsichtbares Datei-Feld für beide Knöpfe.
+           Ohne «capture», damit man Kamera ODER Galerie/Dateien wählen kann. -->
+      <input type="file" id="datei-eingabe" accept="image/*,application/pdf" multiple hidden>
+
+      <div class="datei-hinweise">
+        <p>Fotos oder PDF, höchstens 3 Dateien. PDF: höchstens 10 Seiten und 3 MB.</p>
+        <p>Keine Dateien mit Namen oder persönlichen Daten.</p>
+        <p>Word-Datei? Zuerst als PDF speichern.</p>
+      </div>
 
       <p id="notfall-meldung" class="meldung" role="alert" hidden>
         <svg class="symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg>
@@ -200,7 +221,7 @@
 
   <!-- Das Skript steht am Ende, damit das HTML vorher fertig geladen ist -->
   <!-- Versionsnummer gleich wie oben bei style.css -->
-  <script src="script.js?v=2"></script>
+  <script src="script.js?v=3"></script>
 
 </body>
 </html>

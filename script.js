@@ -393,8 +393,18 @@ function hinzufuegen(ereignis) {
 
 const SERVER_ADRESSE = "https://testliste-server.testliste.workers.dev";
 
-// Gleiche Grenze wie auf dem Server
+// Gleiche Grenzen wie auf dem Server
 const MAX_ZEICHEN = 10000;
+const MAX_DATEIEN = 3;                   // Fotos und PDFs zusammen
+const MAX_BILD_PIXEL = 1500;             // längste Seite eines Fotos nach dem Verkleinern
+const MAX_PDF_SEITEN = 10;
+const MAX_PDF_BYTES = 3 * 1024 * 1024;   // 3 MB
+
+// Die hinzugefügten Dateien: { feld: "lernziele" oder "muster",
+// name, typ (z. B. "image/jpeg"), daten (Base64-Text), vorschau }
+let notfallDateien = [];
+// Zu welchem Feld die nächste gewählte Datei gehört
+let dateiFeld = "lernziele";
 
 // Testmodus: Hängt man ?test an die Adresse (index.html?test),
 // kommt eine feste Beispielantwort statt einer echten Anfrage.
@@ -476,6 +486,11 @@ function zeigeNotfallEingabe(test) {
   document.getElementById("lernziele").value = frueher.lernziele || test.themen || "";
   document.getElementById("muster").value = frueher.muster || "";
 
+  // Dateien werden nicht gespeichert (zu gross für den localStorage),
+  // darum beginnt man hier immer ohne Dateien
+  notfallDateien = [];
+  dateienAnzeigen();
+
   document.getElementById("notfall-meldung").hidden = true;
   document.getElementById("notfall-formular").hidden = false;
   document.getElementById("laden").hidden = true;
@@ -500,6 +515,14 @@ function warten(ms) {
 // oder wirft einen Fehler mit einem Satz, den man verstehen kann.
 async function notfallplanAnfragen(daten) {
   if (TESTMODUS !== null) {
+    // In der Konsole sieht man, was an den Server ginge (ohne die langen Daten)
+    console.log("Testmodus – würde schicken:", {
+      fach: daten.fach,
+      tage: daten.tage,
+      dateien: daten.dateien.map(function (datei) {
+        return datei.feld + ", " + datei.typ + ", " + Math.round(datei.daten.length / 1024) + " KB";
+      }),
+    });
     await warten(1500);
     if (TESTMODUS === "fehler") throw new Error("Für heute sind alle 3 Anfragen aufgebraucht.");
     return { text: BEISPIEL_ANTWORT, abgeschnitten: false, uebrig: 2 };
@@ -541,8 +564,12 @@ async function notfallplanErstellen(ereignis) {
   const lernziele = document.getElementById("lernziele").value.trim();
   const muster = document.getElementById("muster").value.trim();
 
-  if (lernziele === "") {
-    notfallMeldung("Bitte die Lernziele ausfüllen.");
+  // Lernziele als Text ODER als Datei
+  const lernzielDatei = notfallDateien.some(function (datei) {
+    return datei.feld === "lernziele";
+  });
+  if (lernziele === "" && !lernzielDatei) {
+    notfallMeldung("Bitte die Lernziele ausfüllen oder eine Datei hinzufügen.");
     return;
   }
   if (lernziele.length + muster.length > MAX_ZEICHEN) {
@@ -562,6 +589,10 @@ async function notfallplanErstellen(ereignis) {
       tage: tageBis(zuDatum(test.datum)),
       lernziele: lernziele,
       muster: muster,
+      // Ohne Dateinamen: Die könnten persönliche Angaben enthalten
+      dateien: notfallDateien.map(function (datei) {
+        return { feld: datei.feld, typ: datei.typ, daten: datei.daten };
+      }),
     });
 
     // Beim Test speichern, damit man ihn ohne neue Anfrage wieder öffnet
@@ -584,6 +615,173 @@ async function notfallplanErstellen(ereignis) {
     document.getElementById("notfall-formular").hidden = false;
     notfallMeldung(fehler.message);
   }
+}
+
+// ---------------------------------------------------------
+// Dateien (Fotos und PDFs) zum Notfallplan hinzufügen
+// ---------------------------------------------------------
+
+// Knopf «Datei hinzufügen»: merkt sich das Feld und öffnet die Auswahl
+function dateiKnopfGeklickt(ereignis) {
+  dateiFeld = ereignis.currentTarget.dataset.feld;
+  document.getElementById("datei-eingabe").click();
+}
+
+// Wird aufgerufen, wenn man eine oder mehrere Dateien gewählt hat
+async function dateienGewaehlt() {
+  const eingabe = document.getElementById("datei-eingabe");
+  const gewaehlt = Array.from(eingabe.files);
+  // Leeren, damit man dieselbe Datei später nochmals wählen kann
+  eingabe.value = "";
+  document.getElementById("notfall-meldung").hidden = true;
+
+  for (const datei of gewaehlt) {
+    if (notfallDateien.length >= MAX_DATEIEN) {
+      notfallMeldung("Höchstens " + MAX_DATEIEN + " Dateien. Die übrigen wurden weggelassen.");
+      break;
+    }
+    try {
+      const vorbereitet = await dateiVorbereiten(datei);
+      vorbereitet.feld = dateiFeld;
+      notfallDateien.push(vorbereitet);
+    } catch (fehler) {
+      notfallMeldung(fehler.message);
+    }
+  }
+  dateienAnzeigen();
+}
+
+// Macht aus einer gewählten Datei { name, typ, daten, vorschau }
+// oder wirft einen Fehler mit einem verständlichen Satz
+async function dateiVorbereiten(datei) {
+  if (datei.type === "application/pdf") return pdfVorbereiten(datei);
+  if (datei.type.startsWith("image/")) return bildVerkleinern(datei);
+  throw new Error("«" + datei.name + "» geht nicht. Erlaubt sind Fotos und PDF.");
+}
+
+// Fotos vom Handy sind oft riesig. Wir zeichnen sie kleiner
+// auf eine unsichtbare Zeichenfläche und speichern sie als JPEG.
+function bildVerkleinern(datei) {
+  return new Promise(function (fertig, fehlgeschlagen) {
+    const bild = new Image();
+    const adresse = URL.createObjectURL(datei);
+
+    bild.onload = function () {
+      URL.revokeObjectURL(adresse);
+      // Verhältnis so wählen, dass die längste Seite höchstens 1500 px hat
+      const faktor = Math.min(1, MAX_BILD_PIXEL / Math.max(bild.width, bild.height));
+      const flaeche = document.createElement("canvas");
+      flaeche.width = Math.round(bild.width * faktor);
+      flaeche.height = Math.round(bild.height * faktor);
+      const stift = flaeche.getContext("2d");
+      // Weisser Hintergrund, falls das Bild durchsichtige Stellen hat
+      stift.fillStyle = "#ffffff";
+      stift.fillRect(0, 0, flaeche.width, flaeche.height);
+      stift.drawImage(bild, 0, 0, flaeche.width, flaeche.height);
+
+      // Ergebnis: "data:image/jpeg;base64,AAAA…" – wir brauchen nur den Teil nach dem Komma
+      const datenAdresse = flaeche.toDataURL("image/jpeg", 0.85);
+      fertig({
+        name: datei.name,
+        typ: "image/jpeg",
+        daten: datenAdresse.split(",")[1],
+        vorschau: datenAdresse,
+      });
+    };
+
+    bild.onerror = function () {
+      URL.revokeObjectURL(adresse);
+      fehlgeschlagen(new Error("«" + datei.name + "» konnte nicht geöffnet werden."));
+    };
+
+    bild.src = adresse;
+  });
+}
+
+// PDFs werden nicht verändert, nur geprüft (Grösse und Seitenzahl)
+async function pdfVorbereiten(datei) {
+  if (datei.size > MAX_PDF_BYTES) {
+    throw new Error("«" + datei.name + "» ist zu gross. PDFs dürfen höchstens 3 MB haben.");
+  }
+  const bytes = new Uint8Array(await datei.arrayBuffer());
+  const seiten = pdfSeitenZaehlen(bytes);
+  if (seiten > MAX_PDF_SEITEN) {
+    throw new Error("«" + datei.name + "» hat " + seiten + " Seiten. Höchstens " + MAX_PDF_SEITEN + " sind erlaubt.");
+  }
+  return { name: datei.name, typ: "application/pdf", daten: alsBase64(bytes), vorschau: null };
+}
+
+// Zählt die Seiten eines PDFs ungefähr: Jede Seite steht im PDF als
+// "/Type /Page". (Bei manchen gepackten PDFs findet man nichts, dann 0.)
+function pdfSeitenZaehlen(bytes) {
+  const text = new TextDecoder("latin1").decode(bytes);
+  const treffer = text.match(/\/Type\s*\/Page(?![a-zA-Z])/g);
+  return treffer ? treffer.length : 0;
+}
+
+// Wandelt Bytes in Base64-Text um (so kann man Dateien in JSON verschicken).
+// In Stücken, weil btoa mit sehr langen Texten Probleme hat.
+function alsBase64(bytes) {
+  let text = "";
+  const stueck = 0x8000;
+  for (let i = 0; i < bytes.length; i += stueck) {
+    text += String.fromCharCode.apply(null, bytes.subarray(i, i + stueck));
+  }
+  return btoa(text);
+}
+
+// Zeigt unter beiden Feldern die Dateien mit «Entfernen»-Knopf
+function dateienAnzeigen() {
+  ["lernziele", "muster"].forEach(function (feld) {
+    const liste = document.getElementById(feld + "-dateien");
+    liste.textContent = "";
+
+    notfallDateien.forEach(function (datei) {
+      if (datei.feld !== feld) return;
+
+      const eintrag = document.createElement("li");
+      eintrag.className = "datei";
+
+      // Fotos zeigen ein kleines Bild, PDFs ein Schild «PDF»
+      if (datei.vorschau) {
+        const bild = document.createElement("img");
+        bild.className = "datei-bild";
+        bild.src = datei.vorschau;
+        bild.alt = "";
+        eintrag.appendChild(bild);
+      } else {
+        const schild = document.createElement("span");
+        schild.className = "datei-bild datei-pdf";
+        schild.textContent = "PDF";
+        eintrag.appendChild(schild);
+      }
+
+      const name = document.createElement("span");
+      name.className = "datei-name";
+      name.textContent = datei.name;
+      eintrag.appendChild(name);
+
+      const entfernen = document.createElement("button");
+      entfernen.type = "button";
+      entfernen.className = "link datei-entfernen";
+      entfernen.textContent = "Entfernen";
+      entfernen.addEventListener("click", function () {
+        notfallDateien = notfallDateien.filter(function (andere) {
+          return andere !== datei;
+        });
+        dateienAnzeigen();
+      });
+      eintrag.appendChild(entfernen);
+
+      liste.appendChild(eintrag);
+    });
+  });
+
+  // Sind schon 3 Dateien da, verschwinden die Knöpfe «Datei hinzufügen»
+  const voll = notfallDateien.length >= MAX_DATEIEN;
+  document.querySelectorAll(".datei-knopf").forEach(function (knopf) {
+    knopf.hidden = voll;
+  });
 }
 
 // ---------------------------------------------------------
@@ -776,6 +974,10 @@ document.getElementById("neu-erstellen").addEventListener("click", function () {
 document.getElementById("notfall-zurueck").addEventListener("click", zeigeListe);
 document.getElementById("plan-zurueck").addEventListener("click", zeigeListe);
 document.getElementById("notfall-formular").addEventListener("submit", notfallplanErstellen);
+document.querySelectorAll(".datei-knopf").forEach(function (knopf) {
+  knopf.addEventListener("click", dateiKnopfGeklickt);
+});
+document.getElementById("datei-eingabe").addEventListener("change", dateienGewaehlt);
 
 document.getElementById("neuer-test").addEventListener("click", zeigeFormular);
 document.getElementById("zurueck").addEventListener("click", zeigeListe);

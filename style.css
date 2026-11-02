@@ -550,6 +550,89 @@ button {
   box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.2);
 }
 
+/* Knopf «Datei hinzufügen»: gestrichelter Rand, sieht nach «hier ablegen» aus */
+.datei-knopf {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border: 1px dashed var(--blau);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--blau);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.datei-knopf:hover {
+  background: var(--blau-hell);
+}
+
+/* Liste der hinzugefügten Dateien (leer = unsichtbar) */
+.datei-liste {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.datei-liste:empty {
+  display: none;
+}
+
+.datei {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--linie);
+  border-radius: 12px;
+}
+
+/* Kleines Vorschaubild oder Schild «PDF» */
+.datei-bild {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.datei-pdf {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--blau-hell);
+  color: var(--blau);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Lange Namen werden mit «…» gekürzt statt umzubrechen */
+.datei-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.datei-entfernen {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.datei-hinweise {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+  color: var(--grau);
+  font-size: 13px;
+}
+
 /* Die Meldung, wenn Fach oder Datum fehlt */
 .meldung {
   display: flex;
