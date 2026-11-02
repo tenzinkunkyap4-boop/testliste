@@ -11,7 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <!-- Relativer Pfad, damit es auch auf GitHub Pages funktioniert -->
-  <link rel="stylesheet" href="style.css">
+  <!-- ?v=2 ist die Versionsnummer: Bei jedem Update erhöhen (hier UND unten bei script.js),
+       dann lädt das Handy sicher die neue Datei statt der alten aus dem Speicher -->
+  <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
@@ -197,7 +199,8 @@
   </main>
 
   <!-- Das Skript steht am Ende, damit das HTML vorher fertig geladen ist -->
-  <script src="script.js"></script>
+  <!-- Versionsnummer gleich wie oben bei style.css -->
+  <script src="script.js?v=2"></script>
 
 </body>
 </html>
